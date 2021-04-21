@@ -11,38 +11,36 @@ import java.util.*;
 public class WebCrawler {
     public static void main(String[] args) {
         Scanner input = new Scanner(System.in);
-        System.out.print("Enter a URL:");
+        System.out.print("Enter a Wikipedia URL:");
         String url = input.nextLine();
         crawler(url);
     }
 
     public static void crawler (String startingURL) {
-        final int MAX = 100;
+        final int MAX_LINKS = 1000;
 
         ArrayList<String> listOfPendingURLs = new ArrayList<>();
         HashSet<String> listOfTraversedURLs = new HashSet<>();
+        HashMap<String, Integer> wordCountMap = new HashMap<>();
 
         listOfPendingURLs.add(startingURL);
 
         //go through the list of pending urls
-        while (!listOfPendingURLs.isEmpty() && listOfTraversedURLs.size() <= MAX) {
-            //sleep a bit
-//            try {
-//                Thread.sleep(50);
-//            } catch (InterruptedException ex){
-//                //do nothing
-//            }
+        while (!listOfPendingURLs.isEmpty() && listOfTraversedURLs.size() <= MAX_LINKS) {
             String urlString = listOfPendingURLs.remove(0);
 
             if (!listOfTraversedURLs.contains(urlString)) {
                 listOfTraversedURLs.add(urlString);
 
                 try {
-                    Document doc = Jsoup.connect(urlString).get(); //try to connect
+                    Thread.sleep(50); //To avoid DDOS on wikipedia. Throws InterruptException
 
-                    System.out.println(doc.title());
-                    System.out.println("\t" + urlString);
-                    System.out.println("\t" + getWordCount(doc));
+                    Document doc = Jsoup.connect(urlString).get(); //throws IOException
+
+                    System.out.println(doc.title() + "\n");
+
+                    //merge current doc's word count onto wordCountMap
+                    getWordCount(doc).forEach((key, value) -> wordCountMap.merge(key, value, Integer::sum));
 
                     //add the next urls to the list
                     for (String s: getSubURls(doc)) {
@@ -52,22 +50,17 @@ public class WebCrawler {
                     }
                 } catch (IOException ex) {
                     ex.printStackTrace();
+                }catch (InterruptedException ex){
+                    //do nothing
                 }
             }
         }
-    }
-    public static ArrayList<String> getWords (Document document) {
-        ArrayList<String> wordList = new ArrayList<>();
-
-        Elements paragraphs = document.select("p");
-
-        for (Element paragraph : paragraphs) {
-            String words  = paragraph.ownText();
-            wordList.addAll(Arrays.asList(words.split("[^a-zA-Z0-9]+")));
-        }
-        return wordList;
+        //print out the sorted total of all words from every page traversed
+        System.out.println("\nHere are the totals of each word in every page traversed:");
+        System.out.println(new TreeMap<>(wordCountMap)); //sort the words alphabetically and then print them
     }
 
+    /* Returns a map of the number of times each word comes up in the document */
     public static HashMap<String, Integer> getWordCount (Document doc) {
         ArrayList<String> wordList = getWords(doc);
         HashMap<String, Integer>  wordCounts = new HashMap<>();
@@ -85,9 +78,21 @@ public class WebCrawler {
         return wordCounts;
     }
 
+    /* Returns a list of the words in the p tags of the document */
+    public static ArrayList<String> getWords (Document document) {
+        ArrayList<String> wordList = new ArrayList<>();
+        Elements paragraphs = document.select("p"); //get all the p tag elements
+
+        for (Element paragraph : paragraphs) {
+            String words  = paragraph.ownText();
+            wordList.addAll(Arrays.asList(words.split("[^a-zA-Z]+"))); //split on any non-alpha character
+        }
+        return wordList;
+    }
+
+    /* Returns a list of the links to other wikipedia articles in the wikipedia article */
     public static ArrayList<String> getSubURls (Document document) {
         ArrayList<String> list = new ArrayList<>();
-
         Elements links = document.select("a[href]");
 
         for (Element link : links) {
