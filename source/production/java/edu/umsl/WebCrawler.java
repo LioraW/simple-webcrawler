@@ -21,21 +21,17 @@ public class WebCrawler {
 
         ArrayList<String> listOfPendingURLs = new ArrayList<>();
         HashSet<String> listOfTraversedURLs = new HashSet<>();
-        HashSet<String> titles = new HashSet<>();
-        HashMap<String, Integer>  wordCounts = new HashMap<>();
-
 
         listOfPendingURLs.add(startingURL);
 
         //go through the list of pending urls
         while (!listOfPendingURLs.isEmpty() && listOfTraversedURLs.size() <= MAX) {
             //sleep a bit
-            try {
-                Thread.sleep(5);
-            } catch (InterruptedException ex){
-                //do nothing
-            }
-
+//            try {
+//                Thread.sleep(50);
+//            } catch (InterruptedException ex){
+//                //do nothing
+//            }
             String urlString = listOfPendingURLs.remove(0);
 
             if (!listOfTraversedURLs.contains(urlString)) {
@@ -44,9 +40,7 @@ public class WebCrawler {
                 try {
                     Document doc = Jsoup.connect(urlString).get(); //try to connect
 
-                    String title = doc.title();
-                    System.out.println(title);
-
+                    System.out.println(doc.title());
                     System.out.println("\t" + urlString);
                     System.out.println("\t" + getWordCount(doc));
 
@@ -62,7 +56,6 @@ public class WebCrawler {
             }
         }
     }
-
     public static ArrayList<String> getWords (Document document) {
         ArrayList<String> wordList = new ArrayList<>();
 
@@ -70,11 +63,11 @@ public class WebCrawler {
 
         for (Element paragraph : paragraphs) {
             String words  = paragraph.ownText();
-            //System.out.println(words);
-            wordList.addAll(Arrays.asList(words.split(" ")));
+            wordList.addAll(Arrays.asList(words.split("[^a-zA-Z0-9]+")));
         }
         return wordList;
     }
+
     public static HashMap<String, Integer> getWordCount (Document doc) {
         ArrayList<String> wordList = getWords(doc);
         HashMap<String, Integer>  wordCounts = new HashMap<>();
@@ -98,7 +91,6 @@ public class WebCrawler {
         Elements links = document.select("a[href]");
 
         for (Element link : links) {
-
             if (link.attr("href").startsWith("/wiki/")) { //use only internal wikipedia links
                 String fullLinkName = "https://en.wikipedia.org" + link.attr("href");
                 list.add(fullLinkName);
@@ -106,5 +98,4 @@ public class WebCrawler {
         }
         return list;
     }
-
 }
