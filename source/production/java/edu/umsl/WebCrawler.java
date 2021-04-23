@@ -11,8 +11,15 @@ import java.util.*;
 public class WebCrawler {
     public static void main(String[] args) {
         Scanner input = new Scanner(System.in);
-        System.out.print("Enter a Wikipedia URL:");
+
+        System.out.println("Enter a Wikipedia URL such as https://en.wikipedia.org/wiki/NASA:");
         String url = input.nextLine();
+
+        while (!url.trim().startsWith("https://en.wikipedia.org")) {
+            System.out.println("That is not a wikipedia link! Please enter a wikipedia link: ");
+            url = input.nextLine();
+        }
+
         crawler(url);
     }
 
@@ -30,8 +37,6 @@ public class WebCrawler {
             String urlString = listOfPendingURLs.remove(0);
 
             if (!listOfTraversedURLs.contains(urlString)) {
-                listOfTraversedURLs.add(urlString);
-
                 try {
                     Thread.sleep(50); //To avoid DDOS on wikipedia. Throws InterruptException
 
@@ -42,16 +47,19 @@ public class WebCrawler {
                     //merge current doc's word count onto wordCountMap
                     getWordCount(doc).forEach((key, value) -> wordCountMap.merge(key, value, Integer::sum));
 
+                    listOfTraversedURLs.add(urlString);
+
                     //add the next urls to the list
                     for (String s: getSubURls(doc)) {
-                      if (!listOfTraversedURLs.contains(s)){
+                      if (!listOfTraversedURLs.contains(s)) {
                           listOfPendingURLs.add(s);
                       }
                     }
-                } catch (IOException ex) {
-                    ex.printStackTrace();
-                }catch (InterruptedException ex){
-                    //do nothing
+                } catch (IllegalArgumentException ex) {
+                    System.out.println("Error: " + ex.getMessage());
+                    return;
+                } catch (IOException | InterruptedException ex) {
+                    System.out.println("Error: " + ex.getMessage());
                 }
             }
         }
@@ -62,19 +70,11 @@ public class WebCrawler {
 
     /* Returns a map of the number of times each word comes up in the document */
     public static HashMap<String, Integer> getWordCount (Document doc) {
-        ArrayList<String> wordList = getWords(doc);
         HashMap<String, Integer>  wordCounts = new HashMap<>();
 
-        //Add the array of words to the map
-        for (String s : wordList) {
-            if (wordCounts.containsKey(s)) {
-                int newValue = Integer.parseInt(String.valueOf(wordCounts.get(s)));
-                newValue++;
-                wordCounts.put(s, newValue);
-            } else {
-                wordCounts.put(s, 1);
-            }
-        }
+        for (String s : getWords(doc))
+            wordCounts.merge(s, 1, Integer::sum); //if s is a key in wordCounts, value++; else add s with value 1.
+
         return wordCounts;
     }
 
