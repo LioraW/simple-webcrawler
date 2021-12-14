@@ -1,5 +1,6 @@
 package edu.umsl;
 
+import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -11,50 +12,45 @@ import java.util.*;
 public class WebCrawler {
     public static void main(String[] args) {
         Scanner input = new Scanner(System.in);
+//
+//        System.out.println("Enter a Wikipedia URL such as https://en.wikipedia.org/wiki/NASA:");
+//        String url = input.nextLine();
+//
+//        while (!url.trim().startsWith("https://en.wikipedia.org")) {
+//            System.out.println("That is not a wikipedia link! Please enter a wikipedia link: ");
+//            url = input.nextLine();
+//        }
 
-        System.out.println("Enter a Wikipedia URL such as https://en.wikipedia.org/wiki/NASA:");
-        String url = input.nextLine();
-
-        while (!url.trim().startsWith("https://en.wikipedia.org")) {
-            System.out.println("That is not a wikipedia link! Please enter a wikipedia link: ");
-            url = input.nextLine();
-        }
-
+        String url = "https://m.fanfiction.net/s/10847788/1/Goldstein";
         crawler(url);
     }
 
-    public static void crawler (String startingURL) {
-        final int MAX_LINKS = 1000;
+    public static void crawler (String urlString) {
 
-        ArrayList<String> listOfPendingURLs = new ArrayList<>();
-        HashSet<String> listOfTraversedURLs = new HashSet<>();
-        HashMap<String, Integer> wordCountMap = new HashMap<>();
+        int chapterNum = 1;
 
-        listOfPendingURLs.add(startingURL);
+        final int LAST_CHAP = 2;
 
         //go through the list of pending urls
-        while (!listOfPendingURLs.isEmpty() && listOfTraversedURLs.size() <= MAX_LINKS) {
-            String urlString = listOfPendingURLs.remove(0);
-
-            if (!listOfTraversedURLs.contains(urlString)) {
+        while (chapterNum < LAST_CHAP) {
                 try {
-                    Thread.sleep(50); //To avoid DDOS on wikipedia. Throws InterruptException
+                    Thread.sleep(1000); //To avoid DDOS Throws InterruptException
 
-                    Document doc = Jsoup.connect(urlString).get(); //throws IOException
+                    Document doc = Jsoup.connect(urlString)
+                            .referrer("https://m.fanfiction.net//eye/2/1/37370795/10847788/1/Goldstein")
+                            .cookie("__gads=ID=5c6f4395223fb4b6-223d802dbec9003b:T=1627270808:RT=1627270808:S=ALNI_MZigAEC7YRsorVVQJWXB7S3nNRvrg; xcookie2=%7B%22gui_font%22%3A%22Verdana%22%2C%22read_font%22%3A%22Verdana%22%2C%22read_font_size%22%3A1%2C%22read_theme%22%3A%22light%22%2C%22read_line_height%22%3A1.25%2C%22read_width%22%3A100%2C%22read_light_texture%22%3A%22%22%2C%22read_dark_texture%22%3A%22%22%7D; __cf_bm=8068781f680e0a70fe54fdb4428f011a204031fb-1627426655-1800-AZxwjhfpFDD0RM5UfVSeYeqYe8B4PkyxxxogB8lqEMHTkWVZT65W9c9cs5e06xJqOiXVg5HPEpSCgeW1Nf+sSZ9TylOkLmE8whUV+e8Db6s3kN/52z9Xx6bca9wgYz0AMg==","")
+                            .userAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36")
+                            .get(); //throws IOException
 
                     System.out.println(doc.title() + "\n");
 
-                    //merge current doc's word count onto wordCountMap
-                    getWordCount(doc).forEach((key, value) -> wordCountMap.merge(key, value, Integer::sum));
+                    System.out.println(getWords(doc).toString());
 
-                    listOfTraversedURLs.add(urlString);
+                    //get next url
+                    chapterNum++;
+                    urlString = "https://m.fanfiction.net/s/10847788/" + chapterNum + "/Goldstein";
 
-                    //add the next urls to the list
-                    for (String s: getSubURls(doc)) {
-                      if (!listOfTraversedURLs.contains(s)) {
-                          listOfPendingURLs.add(s);
-                      }
-                    }
+
                 } catch (IllegalArgumentException ex) {
                     System.out.println("Error: " + ex.getMessage());
                     return;
@@ -62,45 +58,20 @@ public class WebCrawler {
                     System.out.println("Error: " + ex.getMessage());
                 }
             }
-        }
-        //print out the sorted total of all words from every page traversed
-        System.out.println("\nHere are the totals of each word in every page traversed:");
-        System.out.println(new TreeMap<>(wordCountMap)); //sort the words alphabetically and then print them
+
     }
 
-    /* Returns a map of the number of times each word comes up in the document */
-    public static HashMap<String, Integer> getWordCount (Document doc) {
-        HashMap<String, Integer>  wordCounts = new HashMap<>();
-
-        for (String s : getWords(doc))
-            wordCounts.merge(s, 1, Integer::sum); //if s is a key in wordCounts, value++; else add s with value 1.
-
-        return wordCounts;
-    }
-
-    /* Returns a list of the words in the p tags of the document */
+    /* Returns a list of the lines in the chapter */
     public static ArrayList<String> getWords (Document document) {
-        ArrayList<String> wordList = new ArrayList<>();
-        Elements paragraphs = document.select("p"); //get all the p tag elements
+        ArrayList<String> lines = new ArrayList<>();
 
-        for (Element paragraph : paragraphs) {
-            String words  = paragraph.ownText();
-            wordList.addAll(Arrays.asList(words.split("[^a-zA-Z]+"))); //split on any non-alpha character
+        Element storyText = document.getElementById("storytext");
+
+        for (Element element : storyText.getAllElements()) {
+            lines.add(element.ownText());
         }
-        return wordList;
+
+        return lines;
     }
 
-    /* Returns a list of the links to other wikipedia articles in the wikipedia article */
-    public static ArrayList<String> getSubURls (Document document) {
-        ArrayList<String> list = new ArrayList<>();
-        Elements links = document.select("a[href]");
-
-        for (Element link : links) {
-            if (link.attr("href").startsWith("/wiki/")) { //use only internal wikipedia links
-                String fullLinkName = "https://en.wikipedia.org" + link.attr("href");
-                list.add(fullLinkName);
-            }
-        }
-        return list;
-    }
 }
